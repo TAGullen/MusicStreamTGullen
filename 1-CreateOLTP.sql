@@ -90,9 +90,9 @@ WHERE PlayListName IS NOT NULL
 
 --PlayHistory
 CREATE TABLE PlayHistory (
-	 ListenerID int	 NOT NULL
-	,SongID		int	 NOT NULL
-	,PlayDate	date NOT NULL
+	 ListenerID int		NOT NULL
+	,SongID		int		NOT NULL
+	,PlayDate	date	NOT NULL
 	,CONSTRAINT PK_PlayHistory PRIMARY KEY (ListenerID, SongID, PlayDate)
 	,CONSTRAINT FK_PlayHistory_Song FOREIGN KEY (SongID) REFERENCES Song (SongID)
 	,CONSTRAINT FK_PlayHistory_Listener FOREIGN KEY (ListenerID) REFERENCES Listener (ListenerID)	

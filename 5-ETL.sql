@@ -12,7 +12,6 @@
 USE MusicStreamDW;
 
 SET XACT_ABORT ON;
-SET NOCOUNT ON;
 
 --DimArtist (Type 1) -------------------------------------------------------------------------------------------------------
 MERGE DimArtist AS target
@@ -35,8 +34,16 @@ WHEN NOT MATCHED THEN INSERT (SourceArtistID
 
 
 --DimListener (Type 2) -----------------------------------------------------------------------------------------------------
+DECLARE @UpdatedListeners TABLE (
+     SourceListenerID int PRIMARY KEY
+	,ToDT			  smalldatetime
+	);
+
 UPDATE target
-SET target.ToDT = GETDATE()
+SET target.ToDT = DATEADD(minute, -1, GETDATE())
+OUTPUT inserted.SourceListenerID
+      ,inserted.ToDT
+INTO @UpdatedListeners
 FROM DimListener target
      JOIN MusicStream.dbo.Listener source
 		ON target.SourceListenerID = source.ListenerID
@@ -58,10 +65,15 @@ SELECT
     ,ISNULL(SOR.ListenerName, 'Unknown')
     ,ISNULL(SOR.Email, 'Unknown')
 	,SOR.CreatedDate
-    ,GETDATE()
+    ,CASE 
+		WHEN UPD.SourceListenerID IS NULL THEN '2000-01-01'
+		ELSE DATEADD(minute, 1, UPD.ToDT)
+	 END
     ,'2079-01-01'
     ,GETDATE()
 FROM MusicStream.dbo.Listener SOR
+     LEFT JOIN @UpdatedListeners UPD
+			ON SOR.ListenerID = UPD.SourceListenerID
 WHERE NOT EXISTS (SELECT *
                   FROM DimListener TAR
                   WHERE TAR.SourceListenerID = SOR.ListenerID 
@@ -184,10 +196,10 @@ SELECT
 	,DS.SongKey
     ,CONVERT(INT, FORMAT(PH.PlayDate, 'yyyyMMdd')) AS PlayDateKey
     ,GETDATE()
-FROM MusicStream.dbo.PlayHistory PH
+FROM MusicStream.dbo.PlayHistory PH     
      JOIN DimListener DL 
 			ON PH.ListenerID = DL.SourceListenerID 
-		   AND DL.ToDT = '2079-01-01'
+		   AND PH.PlayDate BETWEEN DL.FromDT AND DL.ToDT
      JOIN DimSong DS 
 			ON PH.SongID = DS.SourceSongID
      LEFT JOIN FactPlayHistory F 

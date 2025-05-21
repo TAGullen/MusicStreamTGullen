@@ -66,9 +66,9 @@ CREATE TABLE DimListener (
 	,SourceListenerID	int			  NOT NULL						--OLTP business key
 	,ListenerName		varchar(100)  NOT NULL
 	,Email				varchar(100)  NOT NULL
-	,CreatedDate		date          NOT NULL
-	,FromDT				date		  NOT NULL DEFAULT GETDATE()	--SCD Type 2 - Effective from date-time
-	,ToDT				date		  NOT NULL DEFAULT '2079-01-01'	--SCD Type 2 - Effective to date-time
+	,CreatedDate		date		  NOT NULL
+	,FromDT				smalldatetime NOT NULL DEFAULT GETDATE()	--SCD Type 2 - Effective from date-time
+	,ToDT				smalldatetime NOT NULL DEFAULT '2079-01-01'	--SCD Type 2 - Effective to date-time
 	,UpdatedDT			smalldatetime NOT NULL DEFAULT GETDATE()
 	,CONSTRAINT PK_DimListener PRIMARY KEY (ListenerKey)
 	);
@@ -185,7 +185,7 @@ END
 --END - DimDate - Date Dimension -------------------------------------------------------------------------------------------
 
 
---FactPlayListSong - Factless Fact
+--FactPlayListSong - Factless Fact -----------------------------------------------------------------------------------------
 CREATE TABLE FactPlayListSong (
 	 PlayListSongKey	int			  NOT NULL IDENTITY(1,1)		--Surrogate key 
 	,PlayListKey		int			  NOT NULL						--dim key
@@ -197,9 +197,10 @@ CREATE TABLE FactPlayListSong (
 CREATE CLUSTERED COLUMNSTORE INDEX CCI_FactPlayListSong ON FactPlayListSong; 
 CREATE INDEX IX_PlayListKey ON FactPlayListSong (PlayListKey);
 CREATE INDEX IX_SongKey ON FactPlayListSong (SongKey);
+--END - FactPlayListSong - Factless Fact -----------------------------------------------------------------------------------
 
 
---FactPlayHistory - Fact
+--FactPlayHistory - Fact ---------------------------------------------------------------------------------------------------
 CREATE TABLE FactPlayHistory (
 	 PlayHistoryKey		int			  NOT NULL IDENTITY(1,1)		--Surrogate key 
 	,ListenerKey		int			  NOT NULL						--dim key
@@ -213,6 +214,7 @@ CREATE CLUSTERED COLUMNSTORE INDEX CCI_FactPlayHistory ON FactPlayHistory;
 CREATE INDEX IX_ListenerKey ON FactPlayHistory (ListenerKey);
 CREATE INDEX IX_SongKey ON FactPlayHistory (SongKey);
 CREATE INDEX IX_PlayDateKey ON FactPlayHistory (PlayDateKey);
+--END - FactPlayHistory - Fact ---------------------------------------------------------------------------------------------
 
 GO
 --END - Create Tables -----------------------------------------------------------------------------
