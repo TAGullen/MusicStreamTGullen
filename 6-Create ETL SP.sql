@@ -1,3 +1,10 @@
+USE MusicStreamDW;
+
+SET ANSI_NULLS ON
+SET QUOTED_IDENTIFIER ON
+
+DROP PROCEDURE IF EXISTS usp_ETL
+GO
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 --Basic ETL for MusicStreamDW from MusicStream
@@ -9,9 +16,28 @@
 --2025-05-16 TAG : Created
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-USE MusicStreamDW;
+CREATE PROCEDURE usp_ETL
+AS
 
-SET XACT_ABORT ON;
+--DimGenre (Type 1) -------------------------------------------------------------------------------------------------------
+MERGE DimGenre AS target
+USING (
+	SELECT GenreID AS SourceGenreID
+	      ,GenreName
+    FROM MusicStream.dbo.Genre
+	) AS source
+ ON target.SourceGenreID = source.SourceGenreID
+WHEN MATCHED AND target.GenreName <> source.GenreName THEN UPDATE SET GenreName = source.GenreName
+                                                                     ,UpdatedDT  = GETDATE()
+WHEN NOT MATCHED THEN INSERT (SourceGenreID
+                             ,GenreName
+							 ,UpdatedDT
+							 )
+                      VALUES (source.SourceGenreID
+					         ,source.GenreName
+							 ,GETDATE());
+--END - DimGenre (Type 1) -------------------------------------------------------------------------------------------------
+
 
 --DimArtist (Type 1) -------------------------------------------------------------------------------------------------------
 MERGE DimArtist AS target
@@ -84,26 +110,31 @@ WHERE NOT EXISTS (SELECT *
 --DimSong (Type 1) ---------------------------------------------------------------------------------------------------------
 MERGE DimSong AS target
 USING (
-    SELECT SON.SongID AS SourceSongID, ISNULL(SON.SongName, 'Unknown') AS SongName, DIMART.SourceArtistID, DIMART.ArtistName, SON.Genre
+    SELECT SON.SongID AS SourceSongID, ISNULL(SON.SongName, 'Unknown') AS SongName, DIMART.SourceArtistID, DIMART.ArtistName, DIMGEN.SourceGenreID, DIMGEN.GenreName
     FROM MusicStream.dbo.Song SON
          LEFT JOIN MusicStreamDW.dbo.DimArtist DIMART 
 		     ON ISNULL(SON.ArtistID, 0) = DIMART.SourceArtistID
+         LEFT JOIN MusicStreamDW.dbo.DimGenre DIMGEN
+		     ON ISNULL(SON.GenreID, 0) = DIMGEN.SourceGenreID
 ) AS source
 ON target.SourceSongID = source.SourceSongID
 WHEN MATCHED AND (   target.SongName <> source.SongName 
                   OR target.SourceArtistID <> source.SourceArtistID
 				  OR target.ArtistName <> source.ArtistName
-				  OR target.Genre <> source.Genre)					THEN UPDATE SET  SongName       = ISNULL(source.SongName, 'Unknown')
+				  OR target.SourceGenreID <> source.SourceGenreID
+				  OR target.GenreName <> source.GenreName)			THEN UPDATE SET  SongName       = ISNULL(source.SongName, 'Unknown')
 																			        ,SourceArtistID = source.SourceArtistID
 																					,ArtistName     = source.ArtistName
-																					,Genre			= source.Genre
+																					,SourceGenreID  = source.SourceGenreID
+																					,GenreName      = source.GenreName
 																					,UpdatedDT      = GETDATE()
 WHEN NOT MATCHED THEN INSERT (
 						 SourceSongID
 						,SongName
 						,SourceArtistID
 						,ArtistName
-						,Genre
+						,SourceGenreID
+						,GenreName
 						,UpdatedDT
 						)
 					  VALUES (
@@ -111,7 +142,8 @@ WHEN NOT MATCHED THEN INSERT (
 						,ISNULL(source.SongName, 'Unknown')
 						,source.SourceArtistID
 						,source.ArtistName
-						,source.Genre
+						,source.SourceGenreID
+						,source.GenreName
 						,GETDATE()
 						);
 --END - DimSong (Type 1) ---------------------------------------------------------------------------------------------------
@@ -209,3 +241,4 @@ FROM MusicStream.dbo.PlayHistory PH
 WHERE F.PlayHistoryKey IS NULL;
 --END - FactPlayHistory ----------------------------------------------------------------------------------------------------
 
+GO

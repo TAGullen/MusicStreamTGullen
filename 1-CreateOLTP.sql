@@ -29,6 +29,7 @@ DROP TABLE IF EXISTS PlayHistory
 DROP TABLE IF EXISTS PlayList
 DROP TABLE IF EXISTS Song
 DROP TABLE IF EXISTS Artist
+DROP TABLE IF EXISTS Genre
 DROP TABLE IF EXISTS Listener
 GO
 --END - Drop Tables -------------------------------------------------------------------------------
@@ -36,6 +37,15 @@ GO
 
 --Create Tables -----------------------------------------------------------------------------------
 IF @@ERROR <> 0 SET NOEXEC ON
+
+--Genre
+CREATE TABLE Genre (
+	 GenreID	int			 NOT NULL IDENTITY(1,1) 
+	,GenreName	varchar(100) NOT NULL
+	,CONSTRAINT PK_Genre PRIMARY KEY (GenreID)
+	,CONSTRAINT UQ_GenreName UNIQUE (GenreName)
+	,CONSTRAINT CK_GenreName CHECK (TRIM(GenreName)<>'')        --<== Blanks disallowed
+	)
 
 --Artist
 CREATE TABLE Artist (
@@ -51,11 +61,11 @@ CREATE TABLE Song (
 	 SongID		int	NOT NULL IDENTITY(1,1)
 	,SongName	varchar(100) 
 	,ArtistID	int			 
-	,Genre      varchar(100)
+	,GenreID    int
 	,CONSTRAINT PK_Song PRIMARY KEY (SongID)
 	,CONSTRAINT CK_SongName CHECK (TRIM(SongName)<>'')            --<== Blanks disallowed
-	,CONSTRAINT CK_Genre CHECK (TRIM(Genre)<>'')				  --<== Blanks disallowed
 	,CONSTRAINT FK_Song_Artist FOREIGN KEY (ArtistID) REFERENCES Artist (ArtistID)
+	,CONSTRAINT FK_Song_Genre FOREIGN KEY (GenreID) REFERENCES Genre (GenreID)
 	)
 CREATE UNIQUE INDEX IXUF_SongName_ArtistID ON Song(SongName, ArtistID)
 WHERE SongName IS NOT NULL

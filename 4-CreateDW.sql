@@ -24,6 +24,7 @@ GO
 IF @@ERROR <> 0 SET NOEXEC ON
 USE MusicStreamDW;
 
+DROP TABLE IF EXISTS DimGenre;
 DROP TABLE IF EXISTS DimArtist;
 DROP TABLE IF EXISTS DimListener;
 DROP TABLE IF EXISTS DimSong;
@@ -39,6 +40,26 @@ GO
 IF @@ERROR <> 0 SET NOEXEC ON
 
 --STAR SCHEMA 
+
+--DimGenre - Slowly Changing Dimension Type1 - Overwrite ------------------------------------------------------------------
+CREATE TABLE DimGenre (
+	 GenreKey		int			  NOT NULL IDENTITY(1,1)			--Surrogate key
+	,SourceGenreID	int			  NOT NULL							--OLTP business key
+	,GenreName		varchar(100)  NOT NULL
+	,UpdatedDT		smalldatetime NOT NULL DEFAULT GETDATE()
+	,CONSTRAINT PK_DimGenre PRIMARY KEY (GenreKey)
+	,CONSTRAINT UQ_SourceGenreID UNIQUE (SourceGenreID)				--Because SCD Type1 for now 	
+	,CONSTRAINT UQ_GenreName UNIQUE (GenreName)						--Because SCD Type1 for now 	
+	);
+
+--For NULL and N/A entries
+SET IDENTITY_INSERT DimGenre ON;
+INSERT INTO DimGenre (GenreKey, SourceGenreID, GenreName)
+VALUES (0, 0, 'Unknown')
+      ,(-1, -1, 'N/A');
+SET IDENTITY_INSERT DimGenre OFF;
+--END - DimGenre - Slowly Changing Dimension Type1 - Overwrite ------------------------------------------------------------
+
 
 --DimArtist - Slowly Changing Dimension Type1 - Overwrite ------------------------------------------------------------------
 CREATE TABLE DimArtist (
@@ -89,16 +110,17 @@ CREATE TABLE DimSong (
 	,SongName		varchar(100)    NOT NULL 
 	,SourceArtistID	int				NOT NULL						--Included for traceability
 	,ArtistName		varchar(100)    NOT NULL 
-	,Genre          varchar(100)    NOT NULL
+	,SourceGenreID	int				NOT NULL						--Included for traceability
+	,GenreName      varchar(100)    NOT NULL
 	,UpdatedDT		smalldatetime   NOT NULL DEFAULT GETDATE()
 	,CONSTRAINT PK_DimSong PRIMARY KEY (SongKey)
 	);
 
 --For NULL and N/A entries
 SET IDENTITY_INSERT DimSong ON;
-INSERT INTO DimSong (SongKey, SourceSongID, SongName, SourceArtistID, ArtistName, Genre)
-VALUES (0, -1, 'Unknown', -1, 'Unknown', 'Unknown')
-      ,(1, -1, 'N/A', -1, 'N/A', 'N/A');
+INSERT INTO DimSong (SongKey, SourceSongID, SongName, SourceArtistID, ArtistName, SourceGenreID, GenreName)
+VALUES (0, -1, 'Unknown', -1, 'Unknown', -1, 'Unknown')
+      ,(-1, -1, 'N/A', -1, 'N/A', -1, 'N/A');
 SET IDENTITY_INSERT DimSong OFF;
 --END - DimSong - Slowly Changing Dimension Type1 - Overwrite --------------------------------------------------------------
 
@@ -117,7 +139,7 @@ CREATE TABLE DimPlayList (
 --For NULL and N/A entries
 SET IDENTITY_INSERT DimPlayList ON;
 INSERT INTO DimPlayList (PlayListKey, SourcePlayListID, PlayListName, SourceListenerID, ListenerName)
-VALUES (0, 0, 'Unknown', -1, 'Unknown')
+VALUES (0, -1, 'Unknown', -1, 'Unknown')
       ,(-1, -1, 'N/A', -1, 'N/A');
 SET IDENTITY_INSERT DimPlayList OFF;
 --END - DimPlayList - Slowly Changing Dimension Type1 - Overwrite ----------------------------------------------------------

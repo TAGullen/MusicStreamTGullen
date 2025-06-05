@@ -43,7 +43,10 @@ GO
 
 
 --Empty Tables =============================================================================================================
+IF @@ERROR <> 0 SET NOEXEC ON
+
 --DO NOT DELETE THIS SECTION -----------------------------------------------------------------------------------------------
+IF NOT EXISTS (SELECT * FROM Genre) INSERT INTO Genre (GenreName) VALUES ('X');			    --<--Do NOT delete. It affects RESEEDING
 IF NOT EXISTS (SELECT * FROM Artist) INSERT INTO Artist (ArtistName) VALUES ('X');			--<--Do NOT delete. It affects RESEEDING
 IF NOT EXISTS (SELECT * FROM Song) INSERT INTO Song (SongName) VALUES ('X');				--<--Do NOT delete. It affects RESEEDING
 IF NOT EXISTS (SELECT * FROM PlayList) INSERT INTO PlayList (PlayListName) VALUES ('X');	--<--Do NOT delete. It affects RESEEDING
@@ -55,47 +58,68 @@ DELETE PlayHistory
 DELETE PlayList
 DELETE Song
 DELETE Artist
+DELETE Genre
 DELETE Listener
 
+DBCC CHECKIDENT ('Genre', RESEED, 0);
 DBCC CHECKIDENT ('Artist', RESEED, 0);
 DBCC CHECKIDENT ('Song', RESEED, 0);
 DBCC CHECKIDENT ('Listener', RESEED, 0);
 DBCC CHECKIDENT ('PlayList', RESEED, 0);
 
---IMPORTANT!
---WE MUST ALSO EMPTY DW DATABASE AS WELL
---BECAUSE ALL TEXTS GENERATED HERE ARE RANDOM YET IDS REMAIN THE SAME!
+--DO NOT DELETE THIS SECTION --------------------------------------------------------------------------------
+--WE MUST EMPTY DW DATABASE AS WELL BECAUSE ALL TEXTS GENERATED ARE RANDOM YET IDS WILL REMAIN THE SAME!
 IF EXISTS (SELECT name FROM sys.databases WHERE name = 'MusicStreamDW')
 BEGIN 
+	IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID('[dbo].[DimGenre]') AND type in ('U'))
+		DELETE MusicStreamDW.dbo.DimGenre WHERE SourceGenreID > 0
 	DELETE MusicStreamDW.dbo.DimArtist WHERE SourceArtistID > 0
 	DELETE MusicStreamDW.dbo.DimListener WHERE SourceListenerID > 0
 	DELETE MusicStreamDW.dbo.DimSong WHERE SourceSongID > 0
 	DELETE MusicStreamDW.dbo.DimPlayList WHERE SourcePlayListID > 0
-	TRUNCATE TABLE MusicStreamDW.dbo.FactPlayListSong
-	TRUNCATE TABLE MusicStreamDW.dbo.FactPlayHistory
+	DELETE MusicStreamDW.dbo.FactPlayListSong
+	DELETE MusicStreamDW.dbo.FactPlayHistory
 END
---END - For DETERMINISTIC IDs uncomment this section -------------------
+--DO NOT DELETE THIS SECTION --------------------------------------------------------------------------------
 --END - Empty Tables =======================================================================================================
 
 
 --Populate Tables ==========================================================================================================
-IF @@ERROR <> 0 SET NOEXEC ON
 DECLARE @Name		 varchar(100)
 DECLARE @I			 int
 DECLARE @NoOfRecords int
 DECLARE @ArtistID	 int
+DECLARE @GenreID	 int
 DECLARE @ListenerID	 int
 DECLARE @PlayListID	 int
 
 
+--Genre -------------------------------------------------------------------------------------------
+--Methodology ----
+--Generate random texts with length = 2, prefixed by GEN
+SET @NoOfRecords = 25 --<== Number of records 
+SET @I = 1
+WHILE @I <= @NoOfRecords
+BEGIN
+    EXEC #GenerateName 'GEN', 2, @Name OUTPUT
+
+    IF NOT EXISTS (SELECT * FROM Genre WHERE GenreName = @Name)
+    BEGIN
+        INSERT INTO Genre (GenreName) VALUES (@Name);
+        SET @I += 1;
+    END
+END
+--END - Genre -------------------------------------------------------------------------------------
+
+
 --Artist ------------------------------------------------------------------------------------------
 --Methodology ----
---Generate random texts with length = 10, prefixed by AR
+--Generate random texts with length = 6, prefixed by ART
 SET @NoOfRecords = 100 --<== Number of records 
 SET @I = 1
 WHILE @I <= @NoOfRecords
 BEGIN
-    EXEC #GenerateName 'AR', 10, @Name OUTPUT
+    EXEC #GenerateName 'ART', 6, @Name OUTPUT
 
     IF NOT EXISTS (SELECT * FROM Artist WHERE ArtistName = @Name)
     BEGIN
@@ -108,7 +132,7 @@ END
 
 --Listener ----------------------------------------------------------------------------------------
 --Methodology ----
---1-Generate random texts with length = 10, prefixed by LI 
+--1-Generate random texts with length = 6, prefixed by LIS 
 --2-Use first 5 charactes of the name generated (excluding LI) as the email. All emails will have @abcd.com
 --3-Make sure records with NULL values in ListenerName and Email exist (as it is allowed)
 --4-Make sure duplicated ListenerNames and Emails exist (as this may be a real life scenario)
@@ -121,16 +145,16 @@ CREATE TABLE #tmpListeners (
 	)
 
 --Populate
-SET @NoOfRecords = 200 --<== Number of records
+SET @NoOfRecords = 300 --<== Number of records
 SET @I = 1
 WHILE @I <= @NoOfRecords
 BEGIN
-    EXEC #GenerateName 'LI', 10, @Name OUTPUT
+    EXEC #GenerateName 'LIS', 6, @Name OUTPUT
 
     IF NOT EXISTS (SELECT * FROM Listener WHERE ListenerName = @Name)
     BEGIN
         INSERT INTO Listener (ListenerName, Email, CreatedDate) 
-		VALUES (@Name, RIGHT(LEFT(LOWER(@Name), 7), 5) + '@abcd.com', DATEADD(day, @I, '2024-07-01'));
+		VALUES (@Name, RIGHT(LEFT(LOWER(@Name), 7), 5) + '@abcd.com', DATEADD(day, @I, '2024-01-01'));
         SET @I += 1;
     END
 END
@@ -193,11 +217,11 @@ WHERE ListenerID IN (SELECT ListenerID FROM #tmpListeners WHERE RowNum = 20)
 
 --Song --------------------------------------------------------------------------------------------
 --Methodology ----
---1-For song names generate a name is a random texts with length=10, prefixed by SO 
---2-Loop through Atrists, for first ArtistID generate 1 song, for next Artist 2 songs and next one 3 songs 
---3 SKIP every 11th Artist to make sure some artist entries have no corresponding songs (as it is allowed)
+--1-For song names generate a name with a random text with length=6, prefixed by SON 
+--2-Loop through Atrists, generate x number of songs, x being a random integer between 0 and 20 (0 included intentionally)
+--3-Pick up a random GenreID for the song
 --4-Make sure records with NULL values in SongName and ArtistID exist (as it is allowed)
---5-Make sure duplicated SongName and ArtistIDs exist (as this may be a real life scenario)
+--5-Make sure duplicated SongName and ArtistIDs exist (but NOT both, as this may be a real life scenario)
 
 DROP TABLE IF EXISTS #tmpSongs
 CREATE TABLE #tmpSongs (
@@ -207,32 +231,30 @@ CREATE TABLE #tmpSongs (
 	,ArtistID int
 	)
 
-DECLARE @Genre varchar(100)
-
 --Populate
 SET @ArtistID = (SELECT MIN(ArtistID) FROM Artist) 
-WHILE @ArtistID <= (SELECT MAX(ArtistID) FROM Artist) 
+WHILE @ArtistID IS NOT NULL 
 BEGIN
-	IF @ArtistID % 11 > 0 --<== Skip 11th of the artists intentionally
-	BEGIN
-		--Insert 1 song for a 3rd of artists, 2 songs for another 3rd, and 3 songs for the rest based on ArtistID
-		SET @I = 1
-		WHILE @I <= 3
-		BEGIN 
-			EXEC #GenerateName 'SO', 10, @Name OUTPUT	
-	        EXEC #GenerateName 'GE', 1, @Genre OUTPUT	
+	--Insert a random number of songs for the artist
+	SET @NoOfRecords = CONVERT(int, ROUND(RAND() * 20, 0)) 
+		
+	SET @I = 1
+	WHILE @I <= @NoOfRecords
+	BEGIN 
+		EXEC #GenerateName 'SON', 6, @Name OUTPUT	
 
-			IF NOT EXISTS (SELECT * FROM Song WHERE SongName = @Name AND ArtistID = @ArtistID)
-			INSERT INTO Song (SongName, ArtistID, Genre) VALUES (@Name, @ArtistID, @Genre);
-	
-			--Decide if enough songs entered
-			IF (@ArtistID % 3) + 1 = @I
-				BREAK
-			ELSE
-				SET @I += 1
-		END
+	    SELECT TOP 1 @GenreID = GenreID
+		FROM Genre
+		ORDER BY NEWID()
+
+		IF NOT EXISTS (SELECT * FROM Song WHERE SongName = @Name AND ArtistID = @ArtistID)
+		BEGIN 
+			INSERT INTO Song (SongName, ArtistID, GenreID) VALUES (@Name, @ArtistID, @GenreID);
+			SET @I += 1
+		END								
 	END
 
+	--Increment ArtistID
 	SET @ArtistID = (SELECT MIN(ArtistID) FROM Artist WHERE ArtistID > @ArtistID) 
 END 
 
@@ -275,30 +297,15 @@ UPDATE Song
 SET ArtistID = (SELECT ArtistID FROM #tmpSongs WHERE RowNum = 18)
 WHERE SongID IN (SELECT SongID FROM #tmpSongs WHERE RowNum = 17)
 --END - Create some duplicate ArtistIDs ---------
-
---Create some duplicate SongNames ---------------
-UPDATE Song
-SET SongName = (SELECT SongName FROM #tmpSongs WHERE RowNum = 11)
-WHERE SongID IN (SELECT SongID FROM #tmpSongs WHERE RowNum = 12)
-
-UPDATE Song
-SET SongName = (SELECT SongName FROM #tmpSongs WHERE RowNum = 19)
-WHERE SongID IN (SELECT SongID FROM #tmpSongs WHERE RowNum BETWEEN 14 AND 15)
-
-UPDATE Song
-SET SongName = (SELECT SongName FROM #tmpSongs WHERE RowNum = 23)
-WHERE SongID IN (SELECT SongID FROM #tmpSongs WHERE RowNum = 20)
---END - Create some duplicate SongNames ---------
 ----END - Song ------------------------------------------------------------------------------------
 
 
 --PlayList ----------------------------------------------------------------------------------------
 --Methodology ----
---1-For playlist names generate a name is a random texts with length=10, prefixed by PL
---2-Loop through listeners, for first ListenerID generate 1 playlist, for next listener 2 playlists and next one 3 playlists
---3 SKIP every 10th listener to make sure some listeners have no corresponding playlists (as it is allowed)
---4-Make sure records with NULL values in PlaylistName and ListenerID exist (as it is allowed)
---5-Make sure duplicated PlaylistName and ListenerIDs exist (as this may be a real life scenario)
+--1-For playlist names generate a name with a random text with length=6, prefixed by PLA
+--2-Loop through listeners, generate x number of playLists, x being a random integer between 0 and 15 (0 included intentionally)
+--3-Make sure records with NULL values in PlaylistName and ListenerID exist (as it is allowed)
+--4-Make sure duplicated PlaylistName and ListenerIDs exist (as this may be a real life scenario)
 
 DROP TABLE IF EXISTS #tmpPlayLists
 CREATE TABLE #tmpPlayLists (
@@ -310,24 +317,20 @@ CREATE TABLE #tmpPlayLists (
 
 --Populate
 SET @ListenerID = (SELECT MIN(ListenerID) FROM Listener) 
-WHILE @ListenerID <= (SELECT MAX(ListenerID) FROM Listener) 
+WHILE @ListenerID IS NOT NULL 
 BEGIN
-	IF @ListenerID % 10 > 0 --<== Skip 10th of the Listeners intentionally
-	BEGIN
-		--Insert 1 playlist for a 3rd of Listeners, 2 playlists for another 3rd, and 3 playlists for the rest based on ListenerID
-		SET @I = 1
-		WHILE @I <= 3
-		BEGIN 
-			EXEC #GenerateName 'PL', 10, @Name OUTPUT	
-	    
-			IF NOT EXISTS (SELECT * FROM Playlist WHERE PlaylistName = @Name AND ListenerID = @ListenerID)
-			INSERT INTO Playlist (PlaylistName, ListenerID) VALUES (@Name, @ListenerID);
+	--Insert a random number of playlists for the song
+	SET @NoOfRecords = CONVERT(int, ROUND(RAND() * 15, 0)) 
 	
-			--Decide if enough Playlists entered
-			IF (@ListenerID % 3) + 1 = @I
-				BREAK
-			ELSE
-				SET @I += 1
+	SET @I = 1
+	WHILE @I <= @NoOfRecords
+	BEGIN 
+		EXEC #GenerateName 'PLA', 6, @Name OUTPUT	
+	    
+		IF NOT EXISTS (SELECT * FROM Playlist WHERE PlaylistName = @Name AND ListenerID = @ListenerID)
+		BEGIN 
+			INSERT INTO Playlist (PlaylistName, ListenerID) VALUES (@Name, @ListenerID);	
+			SET @I += 1
 		END
 	END
 
@@ -373,81 +376,26 @@ UPDATE Playlist
 SET ListenerID = (SELECT ListenerID FROM #tmpPlaylists WHERE RowNum = 18)
 WHERE PlaylistID IN (SELECT PlaylistID FROM #tmpPlaylists WHERE RowNum = 17)
 --END - Create some duplicate ListenerIDs ---------
-
---Create some duplicate PlaylistNames ---------------
-UPDATE Playlist
-SET PlaylistName = (SELECT PlaylistName FROM #tmpPlaylists WHERE RowNum = 11)
-WHERE PlaylistID IN (SELECT PlaylistID FROM #tmpPlaylists WHERE RowNum = 12)
-
-UPDATE Playlist
-SET PlaylistName = (SELECT PlaylistName FROM #tmpPlaylists WHERE RowNum = 19)
-WHERE PlaylistID IN (SELECT PlaylistID FROM #tmpPlaylists WHERE RowNum BETWEEN 14 AND 15)
-
-UPDATE Playlist
-SET PlaylistName = (SELECT PlaylistName FROM #tmpPlaylists WHERE RowNum = 23)
-WHERE PlaylistID IN (SELECT PlaylistID FROM #tmpPlaylists WHERE RowNum = 20)
---END - Create some duplicate PlaylistNames ---------
 --END - PlayList ----------------------------------------------------------------------------------
 
 
 --PlayListSong ------------------------------------------------------------------------------------
 --Methodology ----
---1-Loop through playlists
---2-Insert 0 song for the first PlayList, 1 song for the next, 2, 3, ... 9 songs for the next PlayLists then start with 0 song again
---3-Remember which song was entered last and continue with the next song next time.
---4-When the songs list exhausted, start again from the first song ensuring same song is included in multiple playlists (many-to-many matching)
-
-DECLARE @tblSongIDs TABLE (SongID int NOT NULL PRIMARY KEY)
-DECLARE @LastSongID       int
-DECLARE @NumOfSongsWanted int
-DECLARE @NumOfSongsPicked int 
+--Loop through playlists, randomly pick up x number of songs, x itself being a random integer between 0 and 30 (0 included intentionally)
 
 --Populate
-SET @NumOfSongsWanted = -1                                     --<==Start with -1 as it will be incremented
-SET @LastSongID       = -1                                     --<==Start with less than min SongID
-SET @PlayListID       = (SELECT MIN(PlayListID) FROM PlayList) --<==Start with the min PlayListID
+SET @PlayListID = (SELECT MIN(PlayListID) FROM PlayList) --<==Start with the min PlayListID
 
 WHILE @PlayListID IS NOT NULL
 BEGIN
-	--Insert 0 song for the first PlayList, 1 song for the next, 2, 3, ... 9 songs for the next PlayLists then start from 0 again based on CIRCULAR @NumOfSongsWanted	
-	SET @NumOfSongsWanted = (@NumOfSongsWanted + 1) % 10
-
-	DELETE FROM @tblSongIDs
-	INSERT INTO @tblSongIDs
-	SELECT TOP(@NumOfSongsWanted) SongID --<==Insert no of records based on @NumOfSongsWanted 
-	FROM Song
-	WHERE SongID > @LastSongID
-	ORDER BY SongID
-		
-	SET @NumOfSongsPicked = (SELECT COUNT(*) FROM @tblSongIDs)
+	SET @NoOfRecords = CONVERT(int, ROUND(RAND() * 30, 0))
 
 	--Insert the picked Songs
 	INSERT INTO PlayListSong (PlayListID, SongID)
-	SELECT @PlayListID, SongID
-	FROM @tblSongIDs
-
-	--If not enough songs picked it means we've reached the end of Songs table. So, start from the beginnig again.
-	IF @NumOfSongsPicked < @NumOfSongsWanted 
-	BEGIN
-		--Go back to the beginning of Song table
-		SET @LastSongID = -1
-
-		DELETE FROM @tblSongIDs
-		INSERT INTO @tblSongIDs
-		SELECT TOP(@NumOfSongsWanted - @NumOfSongsPicked) SongID --<==Insert the missing IDs
-		FROM Song
-		WHERE SongID > @LastSongID
-		ORDER BY SongID
-
-		--Insert the picked Songs
-		INSERT INTO PlayListSong (PlayListID, SongID)
-		SELECT @PlayListID, SongID
-		FROM @tblSongIDs
-	END
-
-	--Remember the last SongID
-	SET @LastSongID = ISNULL((SELECT MAX(SongID) FROM @tblSongIDs), @LastSongID)
-
+	SELECT TOP(@NoOfRecords) @PlayListID, SongID 
+	FROM Song
+	ORDER BY NEWID()
+	
 	--Set the next PlayListID
 	SET @PlayListID = (SELECT MIN(PlayListID) FROM PlayList WHERE PlayListID > @PlayListID) 
 END 
@@ -455,95 +403,59 @@ END
 
 
 --PlayHistory -------------------------------------------------------------------------------------
-DECLARE @PlayDateFirst date
-DECLARE @PlayDateLast  date
-DECLARE @PlayDate      date
-DECLARE @ListenerIDs  TABLE (ListenerID int PRIMARY KEY)
+DECLARE @PlayDateFirst			date
+DECLARE @PlayDateLast			date
+DECLARE @PlayDate				date
+DECLARE @NoOfDaysSelected		int
+DECLARE @tblPlayDatesSelected	TABLE (theDate date PRIMARY KEY)
+DECLARE @tblPlayDatesAll		TABLE (theDate date PRIMARY KEY)
+DECLARE @CreatedDate			date
 
 --Methodology --------
---1-Assign a listening frequency (F) for each listener from 0 to 16. Listeners with F=0 never listen anything. Others listen songs once every F days.
---2-Step through days from @PlayDateFirst to @PlayDateLast
---3-On each day, determine the listeners who will listen songs on that day based on frequency (F) explained above
---4-Loop through the listeners of the day and assign songs from 1 to 13 to each of them (another prime number to avoid pattern repetition)
---5-Remember the last song entered and continue with the next song next time.
---4-When the songs list exhausted, start again from the first song and continue
---6-When all listeners of the day looped through, move onto the next day and prepare a new listeners list for the next day and continue until the last day.
---7-This ensures for ech day, there are a sunbset of listeners listen varying number of songs and some listeners never listen anything (a likely real life scenario).
+--1-Loop through the listeners and decide the days each listener listened songs. 
+--2-Loop through each day and randomly enter some songs into PlayHistory table for this user and day.
 
 --Populate
-SET @PlayDateFirst    = '2024-07-01'
-SET @PlayDateLast     = '2025-05-20'
+SET @PlayDateFirst    = '2024-01-01'
+SET @PlayDateLast     = GETDATE()
 SET @PlayDate         = @PlayDateFirst
-SET @NumOfSongsWanted = 0                                        --<==Start with 0 but first value USED will be 1. Will repeat from 1 to 19
-SET @LastSongID       = -1                                       --<==Start with less than min SongID
 
-WHILE @PlayDate <= @PlayDateLast --DATE LOOP --------------------------
+--Build the 'all dates' table
+WHILE @PlayDate <= @PlayDateLast
 BEGIN
-    --Determine all listeners on the day
-	DELETE @ListenerIDs
-	INSERT INTO @ListenerIDs
-	SELECT ListenerID
-	FROM Listener 
-	WHERE (ListenerID % 17) > 0 
-	  AND (DATEDIFF(day, @PlayDateFirst, @PlayDate) + 1) % (ListenerID % 17) = 0
-		
-	SET @ListenerID = (SELECT MIN(ListenerID) FROM @ListenerIDs) --<==Start with the min ListenerID of the day
-
-	WHILE @ListenerID IS NOT NULL --LISTENER LOOP -------------------
-	BEGIN
-	    --SELECT @ListenerID
-
-		--Insert 1 song for the first listener, 2, 3, ... 19 songs for the next listeners then start from 1 again based on CIRCULAR @NumOfSongsWanted	
-		SET @NumOfSongsWanted = @NumOfSongsWanted % 19 + 1
-
-		DELETE FROM @tblSongIDs
-		INSERT INTO @tblSongIDs
-		SELECT TOP(@NumOfSongsWanted) SongID --<==Insert no of records based on @NumOfSongsWanted 
-		FROM Song
-		WHERE SongID > @LastSongID
-		ORDER BY SongID
-		
-		SET @NumOfSongsPicked = (SELECT COUNT(*) FROM @tblSongIDs)
-
-		--Insert the picked Songs
-		INSERT INTO PlayHistory (ListenerID, SongID, PlayDate)
-		SELECT @ListenerID, SongID, @PlayDate
-		FROM @tblSongIDs
-
-		--If not enough songs picked it means we've reached the end of Songs table. So, start from the beginnig again.
-		IF @NumOfSongsPicked < @NumOfSongsWanted 
-		BEGIN
-			--Go back to the beginning of Song table
-			SET @LastSongID = -1
-
-			DELETE FROM @tblSongIDs
-			INSERT INTO @tblSongIDs
-			SELECT TOP(@NumOfSongsWanted - @NumOfSongsPicked) SongID --<==Insert the missing IDs
-			FROM Song
-			WHERE SongID > @LastSongID
-			ORDER BY SongID
-
-			--Insert the picked Songs
-			INSERT INTO PlayHistory (ListenerID, SongID, PlayDate)
-			SELECT @ListenerID, SongID, @PlayDate
-			FROM @tblSongIDs
-		END
-
-		--Remember the last SongID
-		SET @LastSongID = (SELECT MAX(SongID) FROM @tblSongIDs)
-
-		--Set the next ListenerID
-		SET @ListenerID = (SELECT MIN(ListenerID) FROM @ListenerIDs WHERE ListenerID > @ListenerID)
-	END 
+	INSERT INTO @tblPlayDatesAll 
+	VALUES (@PlayDate)
 
 	SET @PlayDate = DATEADD(day, 1, @PlayDate)
 END
 
---Delete records before Listener.CreatedDate
-DELETE PlayHistory
-FROM Listener LST
-     INNER JOIN PlayHistory HIS
-			ON LST.ListenerID = HIS.ListenerID
-WHERE LST.CreatedDate > HIS.PlayDate
---END - PlayHistory -------------------------------------------------------------------------------
+SET @ListenerID = (SELECT MIN(ListenerID) FROM Listener) 
+WHILE @ListenerID IS NOT NULL 
+BEGIN
+	SET @CreatedDate = (SELECT CreatedDate FROM Listener WHERE ListenerID = @ListenerID)
+	SET @NoOfDaysSelected = CONVERT(int, ROUND(RAND() * DATEDIFF(day, @CreatedDate, @PlayDateLast), 0)) 
+
+	DELETE @tblPlayDatesSelected 
+	INSERT INTO @tblPlayDatesSelected 
+	SELECT TOP (@NoOfDaysSelected) TheDate
+	FROM @tblPlayDatesAll
+	WHERE TheDate >= @CreatedDate
+	ORDER BY NEWID()
+
+	SET @PlayDate = (SELECT MIN(theDate) FROM @tblPlayDatesSelected) 
+	WHILE @PlayDate IS NOT NULL
+	BEGIN 
+		--Insert a random number of songs
+		SET @NoOfRecords = CONVERT(int, ROUND(RAND() * 50, 0)) 	
+	    
+		INSERT INTO PlayHistory (ListenerID, SongID, PlayDate) 
+		SELECT TOP(@NoOfRecords) @ListenerID, SongID, @PlayDate
+		FROM Song
+		ORDER BY NEWID()
+
+		SET @PlayDate = (SELECT MIN(theDate) FROM @tblPlayDatesSelected WHERE theDate > @PlayDate)  
+	END
+
+	SET @ListenerID = (SELECT MIN(ListenerID) FROM Listener WHERE ListenerID > @ListenerID) 
+END 
 --END - Populate Tables ====================================================================================================
