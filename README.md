@@ -10,9 +10,9 @@
 *********************************************
 
 -----Databases-----
-1  - Scripts are for MSSQL Server.
-2  - Scripts are to be run on the local server or on an EC2 instance.
-3  - Scripts have been numbered. Please execute them from 1 to 9 successively.
+1  - Scripts are for MSSQL Server.  
+2  - Scripts are to be run on the local server or on an EC2 instance.  
+3  - Scripts have been numbered. Please execute them from 1 to 9 successively.  
 
 -----Dashboard-----
 4  - Dashboard requires Power BI to be already installed.
