@@ -33,7 +33,10 @@
 -----Refresh-----<br>
 18 - Go to Home, click Refresh.<br>
 19 - If you get "Microsoft SQL: A network-related or instance-specific error occurred..."<br>
-<pre>'''     This means your connection does not work.'''</pre><br>
+&nbsp&nbsp&nbsp&nbsp&nbsp
+     This means your connection does not work.<br>
 20 - If you get an error like below<br>
+&nbsp&nbsp&nbsp&nbsp&nbsp
      "Query '01-AvgSong...' references other queries ... rebuild this data combination."<br>
+&nbsp&nbsp&nbsp&nbsp&nbsp     
      PLEASE REFRESH AGAIN 2 ~ 3 TIMES<br>
