@@ -1,6 +1,6 @@
 
 
---For Measure-08 we need to delete some data -------------------------------------------------------------------------------
+--For Metric-08 we need to delete some data --------------------------------------------------------------------------------
 DELETE PH
 FROM MusicStream.dbo.PlayHistory PH
      JOIN MusicStream.dbo.Song SO 
@@ -16,10 +16,10 @@ FROM MusicStreamDW.dbo.FactPlayHistory PH
 			ON PH.PlayDateKey = DA.DateKey
 WHERE DA.FullDate >= DATEADD(MONTH, -1, CONVERT(date, GETDATE()))
   AND SO.SourceGenreID IN (10, 15)
---END - For Measure-08 we need to delete some data -------------------------------------------------------------------------
+--END - For Metric-08 we need to delete some data --------------------------------------------------------------------------
 
 
---For Measure-17 we need to change listener names and run ETL repeatedly ---------------------------------------------------
+--For Metric-17 we need to change listener names and run ETL repeatedly ----------------------------------------------------
 DECLARE @I int = 1
 
 WHILE @I <= 3
@@ -43,4 +43,4 @@ BEGIN
 
 	SET @I += 1
 END
---END - For Measure-17 we need to change listener names and run ETL repeatedly ---------------------------------------------
+--END - For Metric-17 we need to change listener names and run ETL repeatedly ----------------------------------------------
