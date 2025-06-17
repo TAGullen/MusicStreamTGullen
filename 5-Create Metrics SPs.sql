@@ -1,15 +1,15 @@
 USE MusicStreamDW
 
-DROP PROCEDURE IF EXISTS usp_measure05
-DROP PROCEDURE IF EXISTS usp_measure06
-DROP PROCEDURE IF EXISTS usp_measure07
-DROP PROCEDURE IF EXISTS usp_measure08
-DROP PROCEDURE IF EXISTS usp_measure09
-DROP PROCEDURE IF EXISTS usp_measure10
-DROP PROCEDURE IF EXISTS usp_measure11
-DROP PROCEDURE IF EXISTS usp_measure12
-DROP PROCEDURE IF EXISTS usp_measure13
-DROP PROCEDURE IF EXISTS usp_measure17
+DROP PROCEDURE IF EXISTS usp_metric05
+DROP PROCEDURE IF EXISTS usp_metric06
+DROP PROCEDURE IF EXISTS usp_metric07
+DROP PROCEDURE IF EXISTS usp_metric08
+DROP PROCEDURE IF EXISTS usp_metric09
+DROP PROCEDURE IF EXISTS usp_metric10
+DROP PROCEDURE IF EXISTS usp_metric11
+DROP PROCEDURE IF EXISTS usp_metric12
+DROP PROCEDURE IF EXISTS usp_metric13
+DROP PROCEDURE IF EXISTS usp_metric17
 
 SET ANSI_NULLS ON
 SET QUOTED_IDENTIFIER ON
@@ -20,7 +20,7 @@ GO
 --2025-05-28 : TAG - Temel A. Gullen - Created
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE PROCEDURE usp_measure05 
+CREATE PROCEDURE usp_metric05 
 AS
 
 SET NOCOUNT ON;
@@ -58,7 +58,7 @@ GO
 --2025-05-28 : TAG - Temel A. Gullen - Created
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE PROCEDURE usp_measure06 
+CREATE PROCEDURE usp_metric06 
 AS
 
 SET NOCOUNT ON;
@@ -82,7 +82,7 @@ GO
 --2025-05-28 : TAG - Temel A. Gullen - Created
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE PROCEDURE usp_measure07 
+CREATE PROCEDURE usp_metric07 
 AS
 
 SET NOCOUNT ON;
@@ -105,7 +105,7 @@ GO
 --2025-05-28 : TAG - Temel A. Gullen - Created
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE PROCEDURE usp_measure08 
+CREATE PROCEDURE usp_metric08 
 AS
 
 SET NOCOUNT ON;
@@ -133,7 +133,7 @@ GO
 --2025-05-28 : TAG - Temel A. Gullen - Created
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE PROCEDURE usp_measure09 
+CREATE PROCEDURE usp_metric09 
 AS
 
 SET NOCOUNT ON;
@@ -152,7 +152,7 @@ GO
 --2025-05-28 : TAG - Temel A. Gullen - Created
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE PROCEDURE usp_measure10 
+CREATE PROCEDURE usp_metric10 
 AS
 SET NOCOUNT ON;
 
@@ -179,7 +179,7 @@ GO
 ----2025-05-28 : TAG - Temel A. Gullen - Created
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE PROCEDURE usp_measure11 
+CREATE PROCEDURE usp_metric11 
 AS
 SET NOCOUNT ON;
 
@@ -207,7 +207,7 @@ GO
 --2025-05-28 : TAG - Temel A. Gullen - Created
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE PROCEDURE usp_measure12 
+CREATE PROCEDURE usp_metric12 
 AS
 SET NOCOUNT ON;
 
@@ -246,7 +246,7 @@ GO
 --2025-05-28 : TAG - Temel A. Gullen - Created
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE PROCEDURE usp_measure13 
+CREATE PROCEDURE usp_metric13 
 AS
 SET NOCOUNT ON;
 
@@ -285,7 +285,7 @@ GO
 --2025-05-28 : TAG - Temel A. Gullen - Created
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE PROCEDURE usp_measure17 
+CREATE PROCEDURE usp_metric17 
 AS
 SET NOCOUNT ON;
 SELECT TOP 3
